@@ -6,11 +6,10 @@ from app.models import Base, User as UserModel
 from app.auth.schemas import UserCreate, UserLogin
 from app.auth.auth import hash_password, verify_password
 from app.auth.jwt import create_access_token, verify_token
-
+from app.todo.router import router as todo_router
 
 app = FastAPI()
-
-
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 Base.metadata.create_all(bind=engine)
 
 
@@ -20,7 +19,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
 
 @app.post("/register", response_model=UserCreate)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
@@ -41,16 +39,13 @@ def login_for_access_token(user: UserLogin, db: Session = Depends(get_db)):
     token = create_access_token({"sub": db_user.email})
     return {"access_token": token, "token_type": "bearer"}
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 @app.get("/users/me")
 async def read_users_me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    try:
-        user = verify_token(token)
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    user = verify_token(token)
     return {"email": user.email}
 
 @app.get("/secure-data")
 async def get_secure_data(token: str = Depends(oauth2_scheme)):
     return {"message": "This is secured data", "token": token}
+app.include_router(todo_router)
